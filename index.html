@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>بلاك ستي | التفعيل</title>
+<style>
+:root{--bg:#0a0a0c;--card:#15151a;--line:#2a2a33;--tx:#ececf1;--mut:#8b8b99;--ac:#e11d48;--ok:#22c55e;--no:#ef4444;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(circle at 50% -10%,#2a0b14,var(--bg) 55%);color:var(--tx);font-family:Tahoma,"Segoe UI",Arial,sans-serif;min-height:100vh}
+.w{max-width:560px;margin:0 auto;padding:20px 16px 60px}
+header{text-align:center;padding:28px 0 18px}
+h1{margin:0;font-size:38px;letter-spacing:1px}
+h1 b{color:var(--ac)}
+header p{color:var(--mut);margin:6px 0 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-top:14px}
+label{display:block;font-size:14px;color:var(--mut);margin:12px 0 6px}
+input,textarea,select{width:100%;background:#0e0e12;border:1px solid var(--line);border-radius:10px;color:var(--tx);padding:11px;font:inherit}
+input:focus,textarea:focus{outline:none;border-color:var(--ac)}
+textarea{min-height:80px;resize:vertical}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:12px 16px;color:#fff;background:var(--ac);width:100%;margin-top:16px;font-weight:bold}
+button.s{background:#26262e;width:auto;margin:0;padding:8px 12px;font-size:13px}
+button.g{background:var(--ok)}button.r{background:var(--no)}
+.top{display:flex;justify-content:space-between;align-items:center}
+.tag{display:inline-block;padding:3px 10px;border-radius:99px;font-size:12px;background:#26262e}
+.tag.ok{background:#12351f;color:var(--ok)}.tag.no{background:#3a1515;color:var(--no)}.tag.wait{background:#3a300f;color:#facc15}
+.row{border-top:1px solid var(--line);padding:12px 0}
+.row:first-child{border-top:0}
+.row p{margin:4px 0;font-size:14px;color:var(--mut)}
+.row p span{color:var(--tx)}
+.act{display:flex;gap:8px;margin-top:8px}
+.hid{display:none}
+.msg{margin-top:12px;font-size:14px}
+.link{background:none;color:var(--mut);width:auto;margin:22px auto 0;display:block;font-weight:normal;font-size:13px;text-decoration:underline}
+</style>
+</head>
+<body>
+<div class="w">
+<header><h1>BLACK <b>CITY</b></h1><p>مدينة بلاك ستي للرول بلاي</p></header>
+
+<!-- صفحة التقديم -->
+<div id="apply">
+  <div class="card">
+    <h3 style="margin:0">تقديم التفعيل</h3>
+    <label>اسم الديسكورد</label><input id="dc" maxlength="40">
+    <label>اسم حسابك في روبلوكس</label><input id="rb" maxlength="40" dir="ltr">
+    <label>اسم الشخصية (الاسم الرباعي)</label><input id="ch" maxlength="60">
+    <label>العمر الحقيقي</label><input id="ag" type="number" min="8" max="80">
+    <label>خبرتك في الرول بلاي</label>
+    <select id="ex"><option>مبتدئ</option><option>متوسط</option><option>محترف</option></select>
+    <label>ليش تبي تنضم لبلاك ستي؟</label><textarea id="wh" maxlength="400"></textarea>
+    <button id="send">إرسال الطلب</button>
+    <div class="msg" id="amsg"></div>
+  </div>
+  <div class="card hid" id="mine">
+    <div class="top"><b>حالة طلبك</b><span class="tag wait" id="mst">قيد المراجعة</span></div>
+    <p style="color:var(--mut);font-size:14px;margin-bottom:0" id="mtx"></p>
+  </div>
+  <button class="link" id="open">الإدارة</button>
+</div>
+
+<!-- لوحة الإدارة -->
+<div id="admin" class="hid">
+  <div class="card">
+    <div class="top"><b>لوحة الإدارة</b><button class="s" id="out">خروج</button></div>
+    <div class="msg" id="cnt" style="color:var(--mut)"></div>
+    <div id="list"></div>
+  </div>
+</div>
+</div>
+
+<script>
+// حط رابط الويب هوك حق الديسكورد بين علامتي الاقتباس
+const WEBHOOK="https://discord.com/api/webhooks/1573737693287030814/S7pvm3qtkSGafmJP8wnTDOfGiklwuCxQzA18b4_hRBXv017F7Gr1SPQ_EQ9d-CG7b9yD";
+const CODE="T5bbd", LS="bc_my_app", LS_ALL="bc_all_apps";
+const $=id=>document.getElementById(id);
+let db=null, col=null, apps=[];
+
+const ST={pending:["قيد المراجعة","wait"],accepted:["مقبول ✅","ok"],rejected:["مرفوض ❌","no"]};
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const ls=(k,v)=>{try{if(v===undefined)return JSON.parse(localStorage.getItem(k));localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}};
+
+// الاتصال بقاعدة البيانات المشتركة (تصل الطلبات للإدارة من أي جهاز)
+(async()=>{
+  try{
+    const c=window.claude&&await claude.use("db");
+    if(c){db=c;col=db.collection("applications");
+      col.onSnapshot(s=>{apps=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.t-a.t);renderAdmin();renderMine()},()=>{});}
+  }catch(e){}
+  if(!db){apps=ls(LS_ALL)||[];}
+  renderMine();
+})();
+
+
+async function toDiscord(embed){
+  if(!WEBHOOK)return;
+  try{await fetch(WEBHOOK,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:"Black City",embeds:[embed]})})}catch(e){}
+}
+
+$("send").onclick=async()=>{
+  const v={dc:$("dc").value.trim(),rb:$("rb").value.trim(),ch:$("ch").value.trim(),ag:$("ag").value.trim(),ex:$("ex").value,wh:$("wh").value.trim()};
+  const m=$("amsg");
+  if(!v.dc||!v.rb||!v.ch||!v.ag||!v.wh){m.style.color="#facc15";m.textContent="عبّ كل الخانات أول.";return}
+  const rec={...v,status:"pending",t:Date.now()};
+  $("send").disabled=true;
+  try{
+    let id;
+    if(db){const r=await col.add(rec);id=r.id}
+    else{id="l"+rec.t;apps=[{id,...rec},...apps];ls(LS_ALL,apps)}
+    ls(LS,id);
+    toDiscord({title:"طلب تفعيل جديد",color:0xe11d48,fields:[
+      {name:"اسم الديسكورد",value:v.dc},{name:"حساب روبلوكس",value:v.rb},{name:"اسم الشخصية",value:v.ch},
+      {name:"العمر",value:v.ag,inline:true},{name:"الخبرة",value:v.ex,inline:true},
+      {name:"سبب الانضمام",value:v.wh}],timestamp:new Date().toISOString()});
+    m.style.color="var(--ok)";m.textContent="تم إرسال طلبك للإدارة، انتظر الرد.";
+    ["dc","rb","ch","ag","wh"].forEach(i=>$(i).value="");
+    renderMine();
+  }catch(e){m.style.color="var(--no)";m.textContent="ما انرسل الطلب، جرب مرة ثانية."}
+  $("send").disabled=false;
+};
+
+function renderMine(){
+  const id=ls(LS),a=apps.find(x=>x.id===id);
+  $("mine").classList.toggle("hid",!a);
+  if(!a)return;
+  const [t,c]=ST[a.status]||ST.pending;
+  $("mst").textContent=t;$("mst").className="tag "+c;
+  $("mtx").textContent="الشخصية: "+a.ch;
+}
+
+// فتح الإدارة بالكود
+$("open").onclick=()=>{
+  const p=prompt("اكتب كود الإدارة");
+  if(p===null)return;
+  if(p.trim()===CODE){$("apply").classList.add("hid");$("admin").classList.remove("hid");renderAdmin()}
+  else alert("الكود غلط");
+};
+$("out").onclick=()=>{$("admin").classList.add("hid");$("apply").classList.remove("hid")};
+
+function renderAdmin(){
+  if($("admin").classList.contains("hid"))return;
+  $("cnt").textContent="عدد الطلبات: "+apps.length;
+  $("list").innerHTML=apps.length?apps.map(a=>{
+    const [t,c]=ST[a.status]||ST.pending;
+    return `<div class="row"><div class="top"><b>${esc(a.ch)}</b><span class="tag ${c}">${t}</span></div>
+    <p>ديسكورد: <span>${esc(a.dc)}</span> · روبلوكس: <span>${esc(a.rb)}</span> · العمر: <span>${esc(a.ag)}</span> · الخبرة: <span>${esc(a.ex)}</span></p>
+    <p>السبب: <span>${esc(a.wh)}</span></p>
+    <div class="act"><button class="s g" data-a="accepted" data-i="${esc(a.id)}">قبول</button><button class="s r" data-a="rejected" data-i="${esc(a.id)}">رفض</button><button class="s" data-a="del" data-i="${esc(a.id)}">حذف</button></div></div>`}).join(""):'<p style="color:var(--mut)">ما فيه طلبات للحين.</p>';
+}
+
+$("list").onclick=async e=>{
+  const b=e.target.closest("button");if(!b)return;
+  const id=b.dataset.i,act=b.dataset.a;
+  const a0=apps.find(x=>x.id===id);
+  if(a0&&act!=="del")toDiscord({title:act==="accepted"?"تم قبول طلب":"تم رفض طلب",color:act==="accepted"?0x22c55e:0xef4444,description:a0.ch+" ("+a0.dc+")"});
+  try{
+    if(db){const d=col.doc(id);act==="del"?await d.delete():await d.update({status:act})}
+    else{apps=act==="del"?apps.filter(x=>x.id!==id):apps.map(x=>x.id===id?{...x,status:act}:x);ls(LS_ALL,apps);renderAdmin()}
+  }catch(err){alert("ما تم التنفيذ، جرب مرة ثانية.")}
+};
+</script>
+</body>
+</html>
